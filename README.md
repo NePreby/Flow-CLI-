@@ -34,6 +34,7 @@
     2. **Image-to-Video**: Animate starting images (Start Frame).
     3. **Start & End Frame Interpolation**: Generate smooth transitions between two keyframe images.
   - Configurable video durations (`4s`, `6s`, `8s`, `10s`), resolutions (`720p`, `360p`), and aspect ratios (`16:9`, `9:16`).
+  - **1080p (1K Full HD) Upscaling**: Retrieve and download high-bitrate 1080p upscaled videos directly from Google Flow.
 
 - **💾 Automated Asset Pipeline**:
   - Automatically downloads generated images and videos directly to local storage (`downloads/`).
@@ -164,11 +165,12 @@ python cli.py image "A majestic mechanical tiger in an overgrown botanical green
 
 ### Generate Videos
 ```bash
-# Text-to-Video
+# Text-to-Video with automatic 1080p (1K) upscaled download
 python cli.py video "FPV drone cinematic flythrough of a glowing crystal cave" \
   --model "Omni 1.1 Flash" \
   --ratio 16:9 \
   --resolution 720p \
+  --quality 1080p \
   --duration 8 \
   --count 1 \
   --download
@@ -183,6 +185,9 @@ python cli.py video "Smooth morph transition from sunrise to twilight" \
   --start-image "https://example.com/day.jpg" \
   --end-image "https://example.com/night.jpg" \
   --duration 8
+
+# Upscale an existing video to 1080p Full HD by media ID
+python cli.py upscale "c5d19a3b-7821-4f11-9e2a-18b9f39031d2"
 ```
 
 ---
@@ -219,6 +224,7 @@ The FastAPI server (`app.py`) exposes full RESTful endpoints for integration int
 | `POST` | `/api/cookie` | Update and test Google Flow session cookie. |
 | `POST` | `/api/generate/image` | Submit an image generation request. |
 | `POST` | `/api/generate/video` | Submit a video generation request (Text/Image/Keyframe). |
+| `POST` | `/api/upscale-video` | Upscale and download video in 1080p (1K Full HD) quality. |
 | `POST` | `/api/upload` | Upload local images for Start/End frame video generation. |
 | `POST` | `/api/download` | Download remote media assets to the local server storage. |
 | `GET` | `/api/gallery` | Retrieve metadata of locally stored assets in `downloads/`. |

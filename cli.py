@@ -174,19 +174,72 @@ def cmd_video(args):
 
     for idx, vid in enumerate(videos):
         url = vid.get("url")
+        url_1080 = vid.get("url_1080p")
+        mid = vid.get("media_id")
+        
+        target_url = url
+        quality_label = "720p"
+        if getattr(args, "quality", "1080p") == "1080p":
+            if url_1080:
+                target_url = url_1080
+                quality_label = "1080p (1K)"
+            elif mid and hasattr(client, "get_media"):
+                cached = client.get_media(f"{mid}_upsampled")
+                if cached and cached.get("url"):
+                    target_url = cached["url"]
+                    quality_label = "1080p (1K)"
+
         print(f"    [{idx+1}] URL: {url}")
+        if quality_label == "1080p (1K)":
+            print(f"        -> Bản 1080p Upscaled: {target_url}")
+
         if args.download:
-            filename = f"flow_video_{int(time.time())}_{idx+1}.mp4"
+            suffix = "_1080p" if quality_label.startswith("1080p") else ""
+            filename = f"flow_video_{int(time.time())}_{idx+1}{suffix}.mp4"
             save_path = out_dir / filename
-            dl_ok, path = client.download_media(url, save_path)
+            dl_ok, path = client.download_media(target_url, save_path)
             if dl_ok:
-                print(f"        -> Đã tải về: {path}")
+                print(f"        -> [✓] Đã tải về bản {quality_label}: {path}")
             else:
-                print(f"        -> Lỗi tải: {path}")
+                print(f"        -> [x] Lỗi tải: {path}")
 
     # Cập nhật số điểm
     c_res = client.get_credits()
     print(f"[i] Số điểm còn lại: {c_res.get('credits', 'N/A')} credits")
+
+
+def cmd_upscale(args):
+    cookie = get_cookie()
+    if not cookie:
+        print("[x] Cần cấu hình cookie để nâng cấp video 1080p!")
+        return
+
+    import re
+    mid = args.media_id
+    m = re.search(r'([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})', mid)
+    if m:
+        mid = m.group(1)
+
+    print(f"[*] Đang yêu cầu Google Flow nâng cấp video {mid[:8]} lên 1080p (1K)...")
+    from flow_client import GoogleFlowClient
+    from flow_worker import upscale_video_1080p
+    fc = GoogleFlowClient(cookie=cookie)
+    proj_id = fc.get_or_create_project_id()
+    
+    url_1080 = upscale_video_1080p(cookie, proj_id, mid)
+    if not url_1080:
+        print("[x] Không thể lấy video 1080p từ Google Flow.")
+        return
+
+    print(f"[✓] Đã nhận stream 1080p: {url_1080[:80]}...")
+    out_dir = Path(args.output or DEFAULT_DOWNLOADS_DIR)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_file = out_dir / f"flow_video_{mid[:8]}_1080p.mp4"
+    ok, p = fc.download_media(url_1080, out_file)
+    if ok:
+        print(f"[✓] Tải thành công video 1080p (1K): {p}")
+    else:
+        print(f"[x] Lỗi tải: {p}")
 
 def main():
     parser = argparse.ArgumentParser(description="Google Flow AI Studio - Công Cụ Tạo Ảnh & Video AI")
@@ -223,6 +276,7 @@ def main():
     p_vid.add_argument("--model", default="Omni 1.1 Flash", help="Mô hình (Omni 1.1 Flash, Veo 3.1 - Fast, Veo 3.1 - Lite, Veo 3.1 - Quality)")
     p_vid.add_argument("--ratio", default="16:9", choices=["16:9", "9:16"], help="Tỉ lệ khung hình (16:9, 9:16)")
     p_vid.add_argument("--resolution", default="720p", choices=["720p", "360p"], help="Độ phân giải (720p, 360p - Mặc định: 720p)")
+    p_vid.add_argument("--quality", default="1080p", choices=["1080p", "720p"], help="Chất lượng tải về máy: 1080p (1K Full HD) hoặc 720p (Mặc định: 1080p)")
     p_vid.add_argument("--duration", type=int, default=8, choices=[4, 6, 8, 10], help="Thời lượng giây (4, 6, 8, 10 - Mặc định: 8)")
     p_vid.add_argument("--count", type=int, default=1, choices=[1, 2, 3, 4], help="Số lượng video tạo (1, 2, 3, 4 - Mặc định: 1)")
     p_vid.add_argument("--start-image", default=None, help="Đường dẫn hoặc URL ảnh bắt đầu (Start Frame)")
@@ -231,6 +285,12 @@ def main():
     p_vid.add_argument("--output", default=None, help="Thư mục lưu trữ")
     p_vid.add_argument("--download", action="store_true", default=True, help="Tự động tải về máy")
     p_vid.set_defaults(func=cmd_video)
+
+    # upscale
+    p_upscale = subparsers.add_parser("upscale", help="Nâng cấp video lên 1080p (1K Full HD) từ Flow")
+    p_upscale.add_argument("media_id", help="UUID của video hoặc URL stream video")
+    p_upscale.add_argument("--output", default=None, help="Thư mục lưu trữ")
+    p_upscale.set_defaults(func=cmd_upscale)
 
     args = parser.parse_args()
     if not args.command:

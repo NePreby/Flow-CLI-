@@ -524,6 +524,29 @@
                             </div>
                         </div>
 
+                        <!-- Chất lượng tải video (1080p vs 720p) -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Chất Lượng Tải Về Mặc Định</label>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button 
+                                    type="button"
+                                    @click="videoDownloadQuality = '1080p'" 
+                                    :class="videoDownloadQuality === '1080p' ? 'border-purple-500 bg-purple-500/25 text-purple-300 font-bold shadow-sm' : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700'"
+                                    class="py-2.5 px-3 rounded-xl border text-xs text-center transition-all flex items-center justify-center space-x-1.5">
+                                    <i class="fa-solid fa-wand-magic-sparkles text-amber-400 text-xs"></i>
+                                    <span>1K (1080p Nét cao) ⭐</span>
+                                </button>
+                                <button 
+                                    type="button"
+                                    @click="videoDownloadQuality = '720p'" 
+                                    :class="videoDownloadQuality === '720p' ? 'border-purple-500 bg-purple-500/25 text-purple-300 font-bold shadow-sm' : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700'"
+                                    class="py-2.5 px-3 rounded-xl border text-xs text-center transition-all flex items-center justify-center space-x-1.5">
+                                    <i class="fa-solid fa-film text-xs"></i>
+                                    <span>720p (Gốc)</span>
+                                </button>
+                            </div>
+                        </div>
+
                         <!-- Auto Download Video -->
                         <div class="flex items-center justify-between p-3 rounded-xl bg-slate-900/60 border border-slate-800">
                             <div class="flex items-center space-x-2.5">
@@ -595,15 +618,33 @@
                                     <div class="aspect-video bg-black flex items-center justify-center relative">
                                         <video :src="vid.local_url || vid.url" controls autoplay loop class="w-full h-full object-contain"></video>
                                     </div>
-                                    <div class="p-3.5 bg-slate-950 flex items-center justify-between border-t border-slate-800">
+                                    <div class="p-3.5 bg-slate-950 flex flex-wrap items-center justify-between border-t border-slate-800 gap-2">
                                         <div>
-                                            <p class="text-xs font-semibold text-slate-200" x-text="vid.local_file ? '✓ Tệp máy: ' + vid.local_file : 'Video Veo AI'"></p>
-                                            <p class="text-[11px] text-slate-400" x-text="'Độ phân giải: ' + videoResolution + ' • Thời lượng: ' + videoDuration + 's'"></p>
+                                            <div class="flex items-center space-x-2">
+                                                <p class="text-xs font-semibold text-slate-200" x-text="vid.local_file ? '✓ Tệp máy: ' + vid.local_file : 'Video Veo AI'"></p>
+                                                <template x-if="vid.local_file && vid.local_file.includes('1080p')">
+                                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">1080p Full HD (1K)</span>
+                                                </template>
+                                            </div>
+                                            <p class="text-[11px] text-slate-400 mt-0.5" x-text="'Độ phân giải Flow: ' + (vid.local_file && vid.local_file.includes('1080p') ? '1080p (1K)' : videoResolution) + ' • Thời lượng: ' + videoDuration + 's'"></p>
                                         </div>
-                                        <button @click="downloadSingleMedia(vid.local_url || vid.url, 'video')" class="px-3.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs flex items-center space-x-1.5 transition-colors shadow">
-                                            <i class="fa-solid fa-download text-xs"></i>
-                                            <span>Tải Video về máy</span>
-                                        </button>
+                                        <div class="flex items-center space-x-2">
+                                            <!-- Nút Tải 1K (1080p) -->
+                                            <button 
+                                                @click="downloadVideo1080p(vid)" 
+                                                :disabled="vid._upscaling"
+                                                class="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs flex items-center space-x-1.5 transition-all shadow-md shadow-purple-500/20">
+                                                <i class="fa-solid fa-wand-magic-sparkles text-amber-300 text-xs" :class="{'animate-spin': vid._upscaling}"></i>
+                                                <span x-text="vid._upscaling ? 'Đang tải 1K...' : 'Tải 1K (1080p)'"></span>
+                                            </button>
+                                            <!-- Nút Tải 720p -->
+                                            <button 
+                                                @click="downloadSingleMedia(vid.url_720p || vid.url, 'video')" 
+                                                class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs flex items-center space-x-1.5 border border-slate-700 transition-colors">
+                                                <i class="fa-solid fa-download text-xs"></i>
+                                                <span>Tải 720p</span>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </template>
@@ -673,6 +714,11 @@
                                     </template>
                                     <!-- Overlay action -->
                                     <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center space-x-2">
+                                        <template x-if="item.type === 'video'">
+                                            <button @click.prevent.stop="upscaleGalleryItem(item)" class="p-2 rounded-full bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-md shadow-purple-500/30" title="Tải phiên bản 1080p (1K Full HD)">
+                                                <i class="fa-solid fa-wand-magic-sparkles text-amber-300"></i>
+                                            </button>
+                                        </template>
                                         <a :href="item.url" download class="p-2 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs" title="Tải xuống tệp">
                                             <i class="fa-solid fa-download"></i>
                                         </a>
@@ -793,6 +839,7 @@
                 videoResolution: '720p',
                 videoDuration: 8,
                 videoCount: 1,
+                videoDownloadQuality: '1080p',
                 startFrameUrl: '',
                 startFramePreview: '',
                 endFrameUrl: '',
@@ -950,7 +997,8 @@
                                 count: parseInt(this.videoCount || 1),
                                 start_image_url: (this.videoMode === 'image' || this.videoMode === 'interpolate') ? (this.startFrameUrl || null) : null,
                                 end_image_url: (this.videoMode === 'interpolate') ? (this.endFrameUrl || null) : null,
-                                auto_download: this.autoDownloadVideo
+                                auto_download: this.autoDownloadVideo,
+                                download_quality: this.videoDownloadQuality
                             })
                         });
                         const data = await res.json();
@@ -1041,6 +1089,89 @@
                         }
                     } catch (e) {
                         alert('Lỗi kết nối khi tải: ' + e.message);
+                    }
+                },
+
+                async downloadVideo1080p(vid) {
+                    if (!vid) return;
+                    if (vid.local_file && vid.local_file.includes('1080p')) {
+                        const a = document.createElement('a');
+                        a.href = vid.local_url;
+                        a.download = vid.local_file;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        return;
+                    }
+                    if (vid.url_1080p) {
+                        const fname = vid.local_file ? vid.local_file.replace('.mp4', '_1080p.mp4') : `flow_video_${Date.now()}_1080p.mp4`;
+                        await this.downloadSingleMedia(vid.url_1080p, 'video', fname);
+                        return;
+                    }
+
+                    vid._upscaling = true;
+                    try {
+                        const res = await fetch('/api/upscale-video', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                media_id: vid.media_id,
+                                url: vid.url,
+                                filename: vid.local_file
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            vid.local_file = data.filename;
+                            vid.local_url = data.local_url;
+                            vid.url_1080p = data.url_1080p;
+                            const a = document.createElement('a');
+                            a.href = data.local_url;
+                            a.download = data.filename;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            alert('✓ Đã tải thành công phiên bản 1080p (1K Full HD):\n' + data.filename);
+                            await this.fetchGallery();
+                        } else {
+                            alert('Lỗi nâng cấp 1080p: ' + (data.error || 'Vui lòng thử lại'));
+                        }
+                    } catch (e) {
+                        alert('Lỗi kết nối nâng cấp 1080p: ' + e.message);
+                    } finally {
+                        vid._upscaling = false;
+                    }
+                },
+
+                async upscaleGalleryItem(item) {
+                    if (!item || !item.url) return;
+                    const conf = confirm(`Bạn muốn tải phiên bản 1080p (1K Full HD) cho video "${item.filename}"?`);
+                    if (!conf) return;
+
+                    try {
+                        const res = await fetch('/api/upscale-video', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                filename: item.filename,
+                                url: item.url
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            const a = document.createElement('a');
+                            a.href = data.local_url;
+                            a.download = data.filename;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            alert('✓ Đã tải thành công video 1080p (1K Full HD)!\n' + data.filename);
+                            await this.fetchGallery();
+                        } else {
+                            alert('Không thể nâng cấp video này: ' + (data.error || 'Vui lòng thử lại'));
+                        }
+                    } catch (e) {
+                        alert('Lỗi: ' + e.message);
                     }
                 },
 

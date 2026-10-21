@@ -94,6 +94,12 @@ class GenerateVideoRequest(BaseModel):
     end_image_url: Optional[str] = None
     seed: Optional[int] = None
     auto_download: bool = True
+    download_quality: str = "1080p"
+
+class UpscaleVideoRequest(BaseModel):
+    media_id: Optional[str] = None
+    url: Optional[str] = None
+    filename: Optional[str] = None
 
 class DownloadRequest(BaseModel):
     url: str
@@ -257,18 +263,25 @@ async def api_generate_video(req: GenerateVideoRequest):
     # Tự động tải về nếu được yêu cầu
     if result.get("success") and req.auto_download:
         for idx, vid in enumerate(result.get("videos", [])):
-            url = vid.get("url")
-            if url:
+            # Ưu tiên tải 1080p (1K) nếu download_quality == "1080p"
+            target_url = vid.get("url")
+            quality_suffix = ""
+            if req.download_quality == "1080p" and vid.get("url_1080p"):
+                target_url = vid["url_1080p"]
+                quality_suffix = "_1080p"
+
+            if target_url:
                 timestamp = int(time.time())
                 safe_prompt = "".join([c if c.isalnum() else "_" for c in req.prompt[:30]]).strip("_")
-                filename = f"flow_video_{timestamp}_{idx+1}_{safe_prompt}.mp4"
+                filename = f"flow_video_{timestamp}_{idx+1}_{safe_prompt}{quality_suffix}.mp4"
                 save_path = target_dir / filename
                 
                 client_to_download = get_client() if cookie else demo_client
-                dl_ok, dl_path = await asyncio.to_thread(client_to_download.download_media, url, save_path)
+                dl_ok, dl_path = await asyncio.to_thread(client_to_download.download_media, target_url, save_path)
                 if dl_ok:
                     vid["local_file"] = Path(dl_path).name
                     vid["local_url"] = f"/downloads/{Path(dl_path).name}"
+                    vid["is_1080p"] = ("1080p" in Path(dl_path).name)
 
     # Lấy lại số điểm sau khi tạo
     credits_info = (get_client() if cookie else demo_client).get_credits()
@@ -358,6 +371,54 @@ async def api_sync_videos():
         "synced_count": len(downloaded),
         "videos": downloaded
     }
+
+
+
+
+@app.post("/api/upscale-video")
+async def api_upscale_video(req: UpscaleVideoRequest):
+    """Nâng cấp video lên 1080p (1K Full HD) từ Google Flow và tải về máy."""
+    cookie = get_cookie()
+    if not cookie:
+        return {"success": False, "error": "Chưa cấu hình Cookie Google Flow"}
+
+    cfg = load_config()
+    target_dir = Path(cfg.get("downloads_dir", DOWNLOADS_DIR))
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    client = get_client()
+    proj_id = client.get_or_create_project_id()
+
+    media_id = req.media_id
+    if not media_id and req.url:
+        import re
+        m = re.search(r'([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})', req.url)
+        if m:
+            media_id = m.group(1)
+
+    from flow_worker import upscale_video_1080p
+    url_1080 = await asyncio.to_thread(upscale_video_1080p, cookie, proj_id, media_id or "")
+    if not url_1080:
+        return {"success": False, "error": "Không thể lấy stream 1080p từ Google Flow. Video có thể chưa sẵn sàng."}
+
+    fname = req.filename or f"flow_video_{int(time.time())}.mp4"
+    if not fname.endswith(".mp4"):
+        fname += ".mp4"
+    if "_1080p" not in fname:
+        fname = fname.replace(".mp4", "_1080p.mp4")
+
+    save_path = target_dir / fname
+    ok, p = await asyncio.to_thread(client.download_media, url_1080, save_path)
+    if ok:
+        return {
+            "success": True,
+            "filename": Path(p).name,
+            "path": str(p),
+            "local_url": f"/downloads/{Path(p).name}",
+            "url_1080p": url_1080,
+            "resolution": "1080p Full HD"
+        }
+    return {"success": False, "error": f"Lỗi tải video 1080p: {p}"}
 
 
 @app.get("/api/gallery")

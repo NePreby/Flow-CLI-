@@ -615,10 +615,29 @@ def _generate_video_native_impl(
                                 # Click ngay giữa tile để phát video và kích hoạt stream network
                                 page.mouse.click(b['x'] + b['width'] / 2, b['y'] + b['height'] / 2)
                                 click_start = time.time()
-                                while time.time() - click_start < 5.0:
+                                while time.time() - click_start < 4.0:
                                     if len(captured_video_map) > prev_count:
                                         break
                                     page.wait_for_timeout(300)
+
+                                # Kích hoạt lôi tùy chọn 1080p Upscaled qua menu Download trên modal video
+                                try:
+                                    dl_btn = page.locator('button[aria-label*="download" i], button:has(mat-icon:has-text("download"))').first
+                                    if dl_btn.is_visible():
+                                        dl_btn.click()
+                                        page.wait_for_timeout(400)
+                                        opt_1080 = page.locator('.cdk-overlay-container [role="menuitem"]:has-text("1080p"), .cdk-overlay-container button:has-text("1080p")').first
+                                        if opt_1080.is_visible():
+                                            _safe_print("[*] Dang kich hoat 1080p Upscaled tren Google Flow...")
+                                            opt_1080.click()
+                                            up_st = time.time()
+                                            while time.time() - up_st < 6.0:
+                                                if any("_upsampled" in u for u in captured_video_map.values()):
+                                                    break
+                                                page.wait_for_timeout(300)
+                                except Exception:
+                                    pass
+
                                 page.keyboard.press("Escape")
                                 page.wait_for_timeout(500)
                                 if len(captured_video_map) > prev_count:
@@ -640,8 +659,32 @@ def _generate_video_native_impl(
 
             browser.close()
 
-            results = list(captured_video_map.values())[:needed]
-            if results:
+            # Phân loại video gốc và phiên bản 1080p upsampled
+            video_map_by_id = {}
+            for base, full_url in captured_video_map.items():
+                clean_base = base.split("?")[0]
+                if "_upsampled" in clean_base:
+                    mid = clean_base.split("/")[-1].replace("_upsampled", "")
+                    if mid not in video_map_by_id:
+                        video_map_by_id[mid] = {}
+                    video_map_by_id[mid]["url_1080p"] = full_url
+                else:
+                    mid = clean_base.split("/")[-1]
+                    if mid not in video_map_by_id:
+                        video_map_by_id[mid] = {}
+                    video_map_by_id[mid]["url"] = full_url
+
+            video_items = []
+            for mid, info in video_map_by_id.items():
+                u_main = info.get("url") or info.get("url_1080p")
+                video_items.append({
+                    "media_id": mid,
+                    "url": u_main,
+                    "url_720p": info.get("url") or u_main,
+                    "url_1080p": info.get("url_1080p")
+                })
+
+            if video_items:
                 return {
                     "success": True,
                     "prompt": prompt,
@@ -649,8 +692,8 @@ def _generate_video_native_impl(
                     "aspect_ratio": aspect_ratio,
                     "duration": duration,
                     "resolution": resolution,
-                    "count": len(results),
-                    "videos": [{"url": u, "media_id": str(uuid.uuid4())} for u in results]
+                    "count": len(video_items[:needed]),
+                    "videos": video_items[:needed]
                 }
             else:
                 # Video đã được gửi thành công và đang render async trên Google server
@@ -744,3 +787,70 @@ def _sync_canvas_videos_impl(cookie_str: str, project_id: str, max_videos: int =
 def sync_canvas_videos(*args, **kwargs) -> List[Dict[str, Any]]:
     """Hàm bọc an toàn chạy ngoài asyncio loop cho sync_canvas_videos."""
     return _run_in_thread(_sync_canvas_videos_impl, *args, **kwargs)
+
+
+def _upscale_video_1080p_impl(cookie_str: str, project_id: str, media_id: str) -> Optional[str]:
+    """Lấy hoặc kích hoạt stream 1080p Upscaled thật từ Google Flow."""
+    if not cookie_str or not media_id:
+        return None
+
+    _safe_print(f"[*] Dang ket noi Google Flow kich hoat 1080p cho media {media_id[:8]}...")
+    user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36"
+    captured_1080_url = None
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            context = browser.new_context(viewport={"width": 1366, "height": 850}, user_agent=user_agent)
+            context.add_cookies(_parse_cookie_list(cookie_str))
+            page = context.new_page()
+
+            def on_resp(r):
+                nonlocal captured_1080_url
+                u = r.url
+                if ("flow-content.google/video" in u or "googlevideo.com/videoplayback" in u) and "_upsampled" in u and r.status in [200, 206]:
+                    captured_1080_url = u
+
+            page.on("response", on_resp)
+            page.goto(f"https://flow.google.com/project/{project_id}", wait_until="domcontentloaded", timeout=25000)
+            page.wait_for_timeout(3500)
+
+            tiles = page.locator('flow-tile-container').all()
+            target_tile = None
+            for t in tiles[:12]:
+                is_vid = t.locator('mat-icon:has-text("play_arrow"), mat-icon:has-text("play_circle"), mat-icon:has-text("videocam")').count() > 0
+                if not is_vid:
+                    continue
+                html = t.evaluate("el => el.innerHTML")
+                if media_id in html:
+                    target_tile = t
+                    break
+                if not target_tile:
+                    target_tile = t
+
+            if target_tile:
+                b = target_tile.bounding_box()
+                if b:
+                    page.mouse.click(b['x'] + b['width']/2, b['y'] + b['height']/2)
+                    page.wait_for_timeout(2000)
+                    dl_btn = page.locator('button[aria-label*="download" i], button:has(mat-icon:has-text("download"))').first
+                    if dl_btn.is_visible():
+                        dl_btn.click()
+                        page.wait_for_timeout(500)
+                        opt_1080 = page.locator('.cdk-overlay-container [role="menuitem"]:has-text("1080p"), .cdk-overlay-container button:has-text("1080p")').first
+                        if opt_1080.is_visible():
+                            opt_1080.click()
+                            st = time.time()
+                            while time.time() - st < 12.0:
+                                if captured_1080_url:
+                                    break
+                                page.wait_for_timeout(300)
+            browser.close()
+    except Exception as e:
+        _safe_print(f"[!] Loi upscale video 1080p: {e}")
+
+    return captured_1080_url
+
+def upscale_video_1080p(*args, **kwargs) -> Optional[str]:
+    """Hàm bọc an toàn chạy ngoài asyncio loop cho upscale_video_1080p."""
+    return _run_in_thread(_upscale_video_1080p_impl, *args, **kwargs)
