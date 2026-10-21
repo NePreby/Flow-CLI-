@@ -1,1 +1,0 @@
-Tạo tool tạo ảnh và video từ gg flow ai(trang flow mới của gg), yêu cầu tạo ảnh, video đầy đủ mô hình, hiển thị số điểm còn, có thể tải ảnh về 
