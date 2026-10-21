@@ -1,0 +1,9 @@
+{
+  "cookie": "",
+  "downloads_dir": "downloads",
+  "auto_download": true,
+  "default_image_model": "Nano Banana 2.1",
+  "default_video_model": "Omni 1.1 Flash",
+  "default_duration": 8,
+  "default_count": 2
+}

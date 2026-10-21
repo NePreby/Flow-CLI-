@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="vi" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Flow AI Studio - Công Cụ Tạo Ảnh & Video AI</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        flow: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            900: '#0f172a',
+                            dark: '#090d16',
+                            card: '#131b2e',
+                            border: '#1e293b',
+                            accent: '#8b5cf6'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.5/dist/cdn.min.js"></script>
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+        .code-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        [x-cloak] { display: none !important; }
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #090d16;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #334155;
+        }
+        .glow-effect {
+            box-shadow: 0 0 35px -5px rgba(59, 130, 246, 0.3);
+        }
+        .glow-accent {
+            box-shadow: 0 0 35px -5px rgba(139, 92, 246, 0.3);
+        }
+    </style>
+</head>
+<body class="bg-flow-dark text-slate-100 min-h-screen flex flex-col" x-data="flowApp()" x-init="init()">
+
+    <!-- Header Navigation -->
+    <header class="border-b border-flow-border bg-flow-card/80 backdrop-blur sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <!-- Brand -->
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-500 to-purple-500 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                    <i class="fa-solid fa-wand-magic-sparkles text-white text-lg"></i>
+                </div>
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <span class="font-extrabold text-xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-indigo-300 to-purple-400">Google Flow AI</span>
+                        <span class="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/30 font-semibold">Studio 2.0</span>
+                    </div>
+                    <p class="text-xs text-slate-400 hidden sm:block">Tool tạo ảnh & video đa mô hình chính thức từ Flow AI của Google</p>
+                </div>
+            </div>
+
+            <!-- Credits & Action Badge -->
+            <div class="flex items-center space-x-4">
+                <!-- Live Points / Credits Badge -->
+                <div class="flex items-center bg-gradient-to-r from-blue-950/60 to-purple-950/60 border border-blue-500/30 rounded-xl px-4 py-2 space-x-3 glow-effect">
+                    <div class="flex items-center space-x-2">
+                        <div class="relative flex h-3 w-3">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                        </div>
+                        <span class="text-xs text-slate-400 font-medium">Điểm còn:</span>
+                    </div>
+                    <div class="flex items-baseline space-x-1">
+                        <span class="font-extrabold text-lg text-emerald-400 tracking-tight" x-text="creditsLoading ? '...' : (credits !== null ? credits : '0')">0</span>
+                        <span class="text-xs font-semibold text-slate-400">credits</span>
+                    </div>
+                    <button @click="fetchCredits()" title="Làm mới số điểm" class="text-slate-400 hover:text-white transition-colors p-1">
+                        <i class="fa-solid fa-rotate-right text-xs" :class="{'animate-spin': creditsLoading}"></i>
+                    </button>
+                </div>
+
+                <!-- Open Folder Button -->
+                <button @click="openDownloadsFolder()" title="Mở thư mục lưu ảnh và video trên máy tính" class="hidden sm:flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl px-3 py-2 text-xs font-medium transition-all">
+                    <i class="fa-regular fa-folder-open text-blue-400 text-sm"></i>
+                    <span>Mở thư mục tải</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-2 border-t border-slate-800/60">
+            <button @click="currentTab = 'image'" :class="currentTab === 'image' ? 'border-blue-500 text-blue-400 font-bold bg-blue-500/5' : 'border-transparent text-slate-400 hover:text-slate-200'" class="flex items-center space-x-2 px-5 py-3 border-b-2 text-sm transition-all">
+                <i class="fa-solid fa-image"></i>
+                <span>Tạo Ảnh AI (Imagen)</span>
+            </button>
+            <button @click="currentTab = 'video'" :class="currentTab === 'video' ? 'border-purple-500 text-purple-400 font-bold bg-purple-500/5' : 'border-transparent text-slate-400 hover:text-slate-200'" class="flex items-center space-x-2 px-5 py-3 border-b-2 text-sm transition-all">
+                <i class="fa-solid fa-video"></i>
+                <span>Tạo Video AI (Veo)</span>
+            </button>
+            <button @click="currentTab = 'gallery'; fetchGallery()" :class="currentTab === 'gallery' ? 'border-emerald-500 text-emerald-400 font-bold bg-emerald-500/5' : 'border-transparent text-slate-400 hover:text-slate-200'" class="flex items-center space-x-2 px-5 py-3 border-b-2 text-sm transition-all">
+                <i class="fa-solid fa-photo-film"></i>
+                <span>Thư Viện Đã Tải Về</span>
+                <span class="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-300" x-text="galleryCount">0</span>
+            </button>
+            <button @click="currentTab = 'settings'" :class="currentTab === 'settings' ? 'border-amber-500 text-amber-400 font-bold bg-amber-500/5' : 'border-transparent text-slate-400 hover:text-slate-200'" class="flex items-center space-x-2 px-5 py-3 border-b-2 text-sm transition-all">
+                <i class="fa-solid fa-key"></i>
+                <span>Cài Đặt Cookie Google Flow</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
+
+        <!-- Banner cảnh báo chưa có cookie -->
+        <div x-show="!cookieSet" class="mb-6 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-start justify-between text-amber-300 text-sm">
+            <div class="flex items-start space-x-3">
+                <i class="fa-solid fa-triangle-exclamation text-amber-400 text-lg mt-0.5"></i>
+                <div>
+                    <p class="font-bold">Đang chạy ở chế độ Xem Trước (Demo Mode)</p>
+                    <p class="text-xs text-amber-200/80 mt-0.5">Bạn có thể tạo ảnh và video thử nghiệm ngay. Để kết nối trực tiếp tài khoản Google Flow chính chủ và dùng điểm thực tế, hãy vào tab <b class="underline cursor-pointer" @click="currentTab = 'settings'">Cài Đặt Cookie</b>.</p>
+                </div>
+            </div>
+            <button @click="currentTab = 'settings'" class="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 text-xs font-semibold whitespace-nowrap ml-4">
+                Nhập Cookie ngay
+            </button>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- TAB 1: TẠO ẢNH (IMAGE GENERATOR)               -->
+        <!-- ============================================== -->
+        <div x-show="currentTab === 'image'" class="space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Cột cấu hình (Trái) -->
+                <div class="lg:col-span-5 space-y-5">
+                    <div class="bg-flow-card border border-flow-border rounded-2xl p-5 space-y-5 shadow-xl">
+                        <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+                            <h2 class="font-bold text-base flex items-center space-x-2 text-blue-400">
+                                <i class="fa-solid fa-sliders"></i>
+                                <span>Cấu Hình Sinh Ảnh</span>
+                            </h2>
+                            <span class="text-xs text-slate-400">Google Imagen Engine</span>
+                        </div>
+
+                        <!-- Prompt Input -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Mô Tả Hình Ảnh (Prompt) *</label>
+                            <textarea 
+                                x-model="imagePrompt" 
+                                rows="4" 
+                                placeholder="Ví dụ: Một chú mèo phi hành gia mặc bộ đồ neon lấp lánh đứng trên bề mặt sao Hỏa, góc máy rộng điện ảnh 8K, ánh sáng kịch tính..."
+                                class="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl p-3.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all resize-none"></textarea>
+                            
+                            <!-- Prompt Quick Suggestions -->
+                            <div class="flex flex-wrap gap-1.5 mt-2">
+                                <span class="text-xs text-slate-500 self-center mr-1">Gợi ý phong cách:</span>
+                                <button @click="addPromptStyle('cinematic lighting, photorealistic 8k, highly detailed')" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-0.5 rounded-md border border-slate-700 transition-colors">+ Điện ảnh</button>
+                                <button @click="addPromptStyle('cyberpunk city, neon glow, futuristic atmosphere')" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-0.5 rounded-md border border-slate-700 transition-colors">+ Cyberpunk</button>
+                                <button @click="addPromptStyle('anime aesthetic, studio ghibli style, vibrant colors')" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-0.5 rounded-md border border-slate-700 transition-colors">+ Anime</button>
+                                <button @click="addPromptStyle('3d render, octane render, unreal engine 5 masterpiece')" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-0.5 rounded-md border border-slate-700 transition-colors">+ 3D Render</button>
+                            </div>
+                        </div>
+
+                        <!-- Negative Prompt (Thu gọn) -->
+                        <div x-data="{ open: false }">
+                            <button @click="open = !open" class="text-xs text-slate-400 hover:text-slate-200 flex items-center space-x-1.5 font-medium">
+                                <i class="fa-solid fa-chevron-right text-[10px] transition-transform" :class="{'rotate-90': open}"></i>
+                                <span>Mô tả loại trừ (Negative Prompt - Tùy chọn)</span>
+                            </button>
+                            <div x-show="open" class="mt-2" x-cloak>
+                                <input 
+                                    type="text" 
+                                    x-model="imageNegativePrompt" 
+                                    placeholder="blurry, distorted, low quality, watermark, bad anatomy..." 
+                                    class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500">
+                            </div>
+                        </div>
+
+                        <!-- Model Selection -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Mô Hình (Model)</label>
+                            <div class="grid grid-cols-2 gap-2">
+                                <template x-for="m in models.image_models" :key="m.id">
+                                    <button 
+                                        type="button"
+                                        @click="imageModel = m.id" 
+                                        :class="imageModel === m.id ? 'border-blue-500 bg-blue-500/15 text-blue-300 shadow-md shadow-blue-500/10' : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'"
+                                        class="p-2.5 rounded-xl border text-left transition-all relative overflow-hidden">
+                                        <div class="flex items-center justify-between mb-1">
+                                            <span class="text-xs font-bold truncate" x-text="m.name"></span>
+                                            <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-blue-400 font-semibold" x-text="m.badge"></span>
+                                        </div>
+                                        <p class="text-[10px] text-slate-500 line-clamp-1" x-text="m.desc"></p>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- Aspect Ratio Selection -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Tỉ Lệ Khung Hình (Aspect Ratio)</label>
+                            <div class="grid grid-cols-5 gap-2">
+                                <template x-for="ratio in models.aspect_ratios_image" :key="ratio">
+                                    <button 
+                                        type="button"
+                                        @click="imageRatio = ratio" 
+                                        :class="imageRatio === ratio ? 'border-blue-500 bg-blue-500/20 text-blue-300 font-bold' : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700'"
+                                        class="py-2 px-1 rounded-xl border text-xs text-center transition-all flex flex-col items-center justify-center space-y-1">
+                                        <span x-text="ratio"></span>
+                                        <span class="text-[9px] text-slate-500" x-text="getRatioLabel(ratio)"></span>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- Số lượng ảnh & Seed -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Số Lượng Ảnh: <span class="text-blue-400 font-bold" x-text="'x' + imageCount">x2</span></label>
+                                <div class="flex space-x-2">
+                                    <template x-for="n in [1, 2, 3, 4]" :key="n">
+                                        <button 
+                                            type="button"
+                                            @click="imageCount = n" 
+                                            :class="imageCount === n ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-500/20' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200'"
+                                            class="flex-1 py-1.5 rounded-lg text-xs transition-colors" x-text="'x' + n"></button>
+                                    </template>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Seed (Ngẫu nhiên)</label>
+                                <div class="flex space-x-1">
+                                    <input 
+                                        type="number" 
+                                        x-model="imageSeed" 
+                                        placeholder="Tự động"
+                                        class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500">
+                                    <button @click="imageSeed = Math.floor(Math.random() * 99999999)" title="Tạo seed ngẫu nhiên" class="px-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-300 text-xs">
+                                        <i class="fa-solid fa-dice"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Auto Download Toggle -->
+                        <div class="flex items-center justify-between p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+                            <div class="flex items-center space-x-2.5">
+                                <i class="fa-solid fa-cloud-arrow-down text-emerald-400 text-sm"></i>
+                                <span class="text-xs font-medium text-slate-300">Tự động tải ảnh về máy khi tạo xong</span>
+                            </div>
+                            <input type="checkbox" x-model="autoDownloadImage" class="w-4 h-4 rounded text-blue-600 bg-slate-800 border-slate-700 focus:ring-blue-500">
+                        </div>
+
+                        <!-- Nút Submit -->
+                        <button 
+                            @click="generateImage()" 
+                            :disabled="generatingImage || !imagePrompt.trim()"
+                            :class="generatingImage || !imagePrompt.trim() ? 'opacity-50 cursor-not-allowed bg-slate-800 text-slate-500' : 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold shadow-lg shadow-blue-500/25'"
+                            class="w-full py-3.5 px-4 rounded-xl flex items-center justify-center space-x-2 text-sm transition-all">
+                            <i class="fa-solid fa-wand-magic-sparkles" :class="{'animate-spin': generatingImage}"></i>
+                            <span x-text="generatingImage ? 'Đang gửi yêu cầu và tạo ảnh...' : 'Bắt Đầu Tạo Ảnh'"></span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Cột kết quả (Phải) -->
+                <div class="lg:col-span-7 space-y-4">
+                    <div class="bg-flow-card border border-flow-border rounded-2xl p-5 min-h-[580px] flex flex-col shadow-xl">
+                        <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+                            <h3 class="font-bold text-sm text-slate-200 flex items-center space-x-2">
+                                <i class="fa-regular fa-image text-blue-400"></i>
+                                <span>Kết Quả Ảnh Tạo Mới Nhất</span>
+                            </h3>
+                            <span class="text-xs text-slate-500" x-text="latestImages.length ? latestImages.length + ' ảnh' : 'Chưa có ảnh'"></span>
+                        </div>
+
+                        <!-- Loading State -->
+                        <div x-show="generatingImage" class="flex-1 flex flex-col items-center justify-center py-16 space-y-4" x-cloak>
+                            <div class="w-16 h-16 relative flex items-center justify-center">
+                                <div class="absolute inset-0 rounded-full border-4 border-blue-500/20 border-t-blue-500 animate-spin"></div>
+                                <i class="fa-solid fa-wand-magic-sparkles text-blue-400 text-xl animate-pulse"></i>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-sm font-bold text-slate-200">Google Flow đang vẽ ảnh...</p>
+                                <p class="text-xs text-slate-400 mt-1">Đang xử lý prompt với mô hình <span class="text-blue-400" x-text="imageModel"></span></p>
+                            </div>
+                        </div>
+
+                        <!-- Empty State -->
+                        <div x-show="!generatingImage && latestImages.length === 0" class="flex-1 flex flex-col items-center justify-center py-20 text-center text-slate-500 space-y-3">
+                            <div class="w-16 h-16 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-600 text-2xl">
+                                <i class="fa-regular fa-images"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm font-semibold text-slate-400">Chưa có ảnh nào được tạo</p>
+                                <p class="text-xs text-slate-500 mt-0.5">Nhập mô tả ảnh bên trái và bấm "Bắt Đầu Tạo Ảnh"</p>
+                            </div>
+                        </div>
+
+                        <!-- Image Grid Results -->
+                        <div x-show="!generatingImage && latestImages.length > 0" class="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1">
+                            <template x-for="(img, idx) in latestImages" :key="idx">
+                                <div class="group relative rounded-xl overflow-hidden border border-slate-800 bg-slate-900 flex flex-col justify-between">
+                                    <div class="relative overflow-hidden aspect-video bg-black flex items-center justify-center">
+                                        <img :src="img.local_url || img.url" :alt="'Image ' + idx" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" loading="lazy">
+                                        <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center space-x-3">
+                                            <a :href="img.local_url || img.url" target="_blank" class="p-2.5 rounded-full bg-slate-900/80 hover:bg-slate-900 text-white transition-colors" title="Xem kích thước đầy đủ">
+                                                <i class="fa-solid fa-expand text-sm"></i>
+                                            </a>
+                                            <button @click="downloadSingleMedia(img.local_url || img.url, 'image')" class="p-2.5 rounded-full bg-blue-600 hover:bg-blue-500 text-white shadow-lg transition-colors" title="Tải ảnh về máy">
+                                                <i class="fa-solid fa-download text-sm"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="p-3 bg-slate-950/90 border-t border-slate-800/80 flex items-center justify-between text-xs">
+                                        <span class="text-slate-400 font-medium truncate pr-2" x-text="img.local_file ? '✓ Đã lưu: ' + img.local_file : 'Chưa tải về'"></span>
+                                        <button @click="downloadSingleMedia(img.local_url || img.url, 'image')" class="text-blue-400 hover:text-blue-300 font-semibold flex items-center space-x-1 whitespace-nowrap">
+                                            <i class="fa-solid fa-download text-xs"></i>
+                                            <span>Tải về</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- TAB 2: TẠO VIDEO (VIDEO GENERATOR)             -->
+        <!-- ============================================== -->
+        <div x-show="currentTab === 'video'" class="space-y-6" x-cloak>
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Cột cấu hình (Trái) -->
+                <div class="lg:col-span-5 space-y-5">
+                    <div class="bg-flow-card border border-flow-border rounded-2xl p-5 space-y-5 shadow-xl">
+                        <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+                            <h2 class="font-bold text-base flex items-center space-x-2 text-purple-400">
+                                <i class="fa-solid fa-clapperboard"></i>
+                                <span>Cấu Hình Sinh Video</span>
+                            </h2>
+                            <span class="text-xs text-slate-400">Google Veo AI Engine</span>
+                        </div>
+
+                        <!-- Chế độ tạo video -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Chế Độ Tạo Video</label>
+                            <div class="grid grid-cols-3 gap-2">
+                                <button 
+                                    @click="videoMode = 'text'" 
+                                    :class="videoMode === 'text' ? 'border-purple-500 bg-purple-500/20 text-purple-300 font-bold' : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700'"
+                                    class="py-2 px-1 rounded-xl border text-xs text-center transition-all flex flex-col items-center justify-center space-y-1">
+                                    <i class="fa-solid fa-font text-sm"></i>
+                                    <span>Văn bản (Text)</span>
+                                </button>
+                                <button 
+                                    @click="videoMode = 'image'" 
+                                    :class="videoMode === 'image' ? 'border-purple-500 bg-purple-500/20 text-purple-300 font-bold' : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700'"
+                                    class="py-2 px-1 rounded-xl border text-xs text-center transition-all flex flex-col items-center justify-center space-y-1">
+                                    <i class="fa-solid fa-image text-sm"></i>
+                                    <span>Ảnh thành Video</span>
+                                </button>
+                                <button 
+                                    @click="videoMode = 'interpolate'" 
+                                    :class="videoMode === 'interpolate' ? 'border-purple-500 bg-purple-500/20 text-purple-300 font-bold' : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700'"
+                                    class="py-2 px-1 rounded-xl border text-xs text-center transition-all flex flex-col items-center justify-center space-y-1">
+                                    <i class="fa-solid fa-film text-sm"></i>
+                                    <span>Start & End Frame</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Prompt Input -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Mô Tả Kịch Bản Video (Prompt) *</label>
+                            <textarea 
+                                x-model="videoPrompt" 
+                                rows="3" 
+                                placeholder="Ví dụ: Một chiếc ô tô thể thao bay qua đường hầm ánh sáng tương lai với tốc độ cao, camera lướt theo sườn xe cinematic 4k..."
+                                class="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl p-3.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all resize-none"></textarea>
+                        </div>
+
+                        <!-- Upload Start Frame (khi mode != text) -->
+                        <div x-show="videoMode === 'image' || videoMode === 'interpolate'" class="space-y-2">
+                            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">Khung Hình Bắt Đầu (Start Frame)</label>
+                            <div class="border-2 border-dashed border-slate-700 hover:border-purple-500 rounded-xl p-3 text-center transition-colors bg-slate-900/40 relative">
+                                <input type="file" @change="uploadStartFrame($event)" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
+                                <div class="flex items-center justify-center space-x-2 text-xs text-slate-400" x-show="!startFramePreview">
+                                    <i class="fa-solid fa-cloud-arrow-up text-purple-400"></i>
+                                    <span>Nhấp hoặc kéo thả ảnh vào đây</span>
+                                </div>
+                                <div x-show="startFramePreview" class="flex items-center justify-between" x-cloak>
+                                    <img :src="startFramePreview" class="h-12 w-20 object-cover rounded-lg border border-slate-700">
+                                    <span class="text-xs text-emerald-400 font-semibold">Đã tải ảnh lên</span>
+                                    <button @click.stop="startFramePreview = ''; startFrameUrl = ''" class="text-xs text-rose-400 hover:text-rose-300 p-1">Xóa</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Upload End Frame (khi mode == interpolate) -->
+                        <div x-show="videoMode === 'interpolate'" class="space-y-2" x-cloak>
+                            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">Khung Hình Kết Thúc (End Frame)</label>
+                            <div class="border-2 border-dashed border-slate-700 hover:border-purple-500 rounded-xl p-3 text-center transition-colors bg-slate-900/40 relative">
+                                <input type="file" @change="uploadEndFrame($event)" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
+                                <div class="flex items-center justify-center space-x-2 text-xs text-slate-400" x-show="!endFramePreview">
+                                    <i class="fa-solid fa-cloud-arrow-up text-purple-400"></i>
+                                    <span>Tải ảnh kết thúc vào đây</span>
+                                </div>
+                                <div x-show="endFramePreview" class="flex items-center justify-between" x-cloak>
+                                    <img :src="endFramePreview" class="h-12 w-20 object-cover rounded-lg border border-slate-700">
+                                    <span class="text-xs text-emerald-400 font-semibold">Đã tải ảnh lên</span>
+                                    <button @click.stop="endFramePreview = ''; endFrameUrl = ''" class="text-xs text-rose-400 hover:text-rose-300 p-1">Xóa</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Video Model Selection -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Mô Hình Video (Veo Model)</label>
+                            <div class="space-y-2">
+                                <template x-for="m in models.video_models" :key="m.id">
+                                    <button 
+                                        type="button"
+                                        @click="videoModel = m.id" 
+                                        :class="videoModel === m.id ? 'border-purple-500 bg-purple-500/15 text-purple-300' : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700'"
+                                        class="w-full p-2.5 rounded-xl border text-left transition-all flex items-center justify-between">
+                                        <div>
+                                            <div class="flex items-center space-x-2">
+                                                <span class="text-xs font-bold" x-text="m.name"></span>
+                                                <span class="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-purple-400 font-semibold" x-text="m.badge"></span>
+                                            </div>
+                                            <p class="text-[10px] text-slate-500 mt-0.5" x-text="m.desc"></p>
+                                        </div>
+                                        <i class="fa-solid fa-check text-purple-400 text-xs" x-show="videoModel === m.id"></i>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- Tỉ lệ khung hình Video -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Tỉ Lệ Khung Hình</label>
+                            <div class="grid grid-cols-2 gap-2">
+                                <template x-for="r in models.aspect_ratios_video" :key="r">
+                                    <button 
+                                        type="button"
+                                        @click="videoRatio = r" 
+                                        :class="videoRatio === r ? 'border-purple-500 bg-purple-500/20 text-purple-300 font-bold' : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700'"
+                                        class="py-2.5 px-3 rounded-xl border text-xs text-center transition-all flex items-center justify-center space-x-2">
+                                        <i :class="r === '16:9' ? 'fa-solid fa-desktop' : 'fa-solid fa-mobile-screen'"></i>
+                                        <span x-text="r + ' (' + (r === '16:9' ? 'Ngang' : 'Dọc') + ')'"></span>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- Thời lượng & Độ phân giải (Chuẩn Google Flow) -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Thời Lượng (Duration)</label>
+                                <div class="grid grid-cols-4 gap-1.5">
+                                    <template x-for="d in (models.video_durations || [4, 6, 8, 10])" :key="d">
+                                        <button 
+                                            type="button"
+                                            @click="videoDuration = d" 
+                                            :class="videoDuration === d ? 'border-purple-500 bg-purple-500/25 text-purple-300 font-bold shadow-sm' : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'"
+                                            class="py-2 rounded-xl border text-xs text-center transition-all" x-text="d + 's'"></button>
+                                    </template>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Độ Phân Giải</label>
+                                <div class="grid grid-cols-2 gap-1.5">
+                                    <template x-for="res in (models.video_resolutions || ['720p', '360p'])" :key="res">
+                                        <button 
+                                            type="button"
+                                            @click="videoResolution = res" 
+                                            :class="videoResolution === res ? 'border-purple-500 bg-purple-500/25 text-purple-300 font-bold shadow-sm' : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'"
+                                            class="py-2 rounded-xl border text-xs text-center transition-all" x-text="res"></button>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Số lượng video tạo (Batch Outputs) -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Số Lượng Video: <span class="text-purple-400 font-bold" x-text="'x' + videoCount">x1</span></label>
+                            <div class="flex space-x-2">
+                                <template x-for="n in [1, 2, 3, 4]" :key="n">
+                                    <button 
+                                        type="button"
+                                        @click="videoCount = n" 
+                                        :class="videoCount === n ? 'bg-purple-600 text-white font-bold shadow-md shadow-purple-500/20' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200'"
+                                        class="flex-1 py-1.5 rounded-lg text-xs transition-colors" x-text="'x' + n"></button>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- Auto Download Video -->
+                        <div class="flex items-center justify-between p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+                            <div class="flex items-center space-x-2.5">
+                                <i class="fa-solid fa-cloud-arrow-down text-purple-400 text-sm"></i>
+                                <span class="text-xs font-medium text-slate-300">Tự động tải video về máy khi tạo xong</span>
+                            </div>
+                            <input type="checkbox" x-model="autoDownloadVideo" class="w-4 h-4 rounded text-purple-600 bg-slate-800 border-slate-700 focus:ring-purple-500">
+                        </div>
+
+                        <!-- Nút Submit Video -->
+                        <button 
+                            @click="generateVideo()" 
+                            :disabled="generatingVideo || (!videoPrompt.trim() && !startFrameUrl)"
+                            :class="generatingVideo || (!videoPrompt.trim() && !startFrameUrl) ? 'opacity-50 cursor-not-allowed bg-slate-800 text-slate-500' : 'bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-bold shadow-lg shadow-purple-500/25'"
+                            class="w-full py-3.5 px-4 rounded-xl flex items-center justify-center space-x-2 text-sm transition-all">
+                            <i class="fa-solid fa-video" :class="{'animate-bounce': generatingVideo}"></i>
+                            <span x-text="generatingVideo ? 'Google Veo đang dựng video...' : 'Bắt Đầu Tạo Video'"></span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Cột kết quả Video (Phải) -->
+                <div class="lg:col-span-7 space-y-4">
+                    <div class="bg-flow-card border border-flow-border rounded-2xl p-5 min-h-[580px] flex flex-col shadow-xl">
+                        <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+                            <h3 class="font-bold text-sm text-slate-200 flex items-center space-x-2">
+                                <i class="fa-solid fa-film text-purple-400"></i>
+                                <span>Video Vừa Tạo</span>
+                            </h3>
+                            <span class="text-xs text-slate-500" x-text="latestVideos.length ? latestVideos.length + ' video' : 'Chưa có video'"></span>
+                        </div>
+
+                        <!-- Loading State Video -->
+                        <div x-show="generatingVideo" class="flex-1 flex flex-col items-center justify-center py-16 space-y-4" x-cloak>
+                            <div class="w-16 h-16 relative flex items-center justify-center">
+                                <div class="absolute inset-0 rounded-full border-4 border-purple-500/20 border-t-purple-500 animate-spin"></div>
+                                <i class="fa-solid fa-film text-purple-400 text-xl animate-pulse"></i>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-sm font-bold text-slate-200">Google Veo đang xử lý render video...</p>
+                                <p class="text-xs text-slate-400 mt-1">Quá trình sinh video chuẩn điện ảnh có thể mất từ 30s đến 2 phút tùy độ dài.</p>
+                            </div>
+                        </div>
+
+                        <!-- Empty State Video -->
+                        <div x-show="!generatingVideo && latestVideos.length === 0" class="flex-1 flex flex-col items-center justify-center py-20 text-center text-slate-500 space-y-3">
+                            <div class="w-16 h-16 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-600 text-2xl">
+                                <i class="fa-solid fa-video-slash"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm font-semibold text-slate-400">Chưa có video nào</p>
+                                <p class="text-xs text-slate-500 mt-0.5">Nhập kịch bản video và bấm "Bắt Đầu Tạo Video"</p>
+                            </div>
+                        </div>
+
+                        <!-- Video Player Results -->
+                        <div x-show="!generatingVideo && latestVideos.length > 0" class="space-y-4 flex-1">
+                            <template x-for="(vid, idx) in latestVideos" :key="idx">
+                                <div class="rounded-xl overflow-hidden border border-slate-800 bg-slate-900">
+                                    <div class="aspect-video bg-black flex items-center justify-center relative">
+                                        <video :src="vid.local_url || vid.url" controls autoplay loop class="w-full h-full object-contain"></video>
+                                    </div>
+                                    <div class="p-3.5 bg-slate-950 flex items-center justify-between border-t border-slate-800">
+                                        <div>
+                                            <p class="text-xs font-semibold text-slate-200" x-text="vid.local_file ? '✓ Tệp máy: ' + vid.local_file : 'Video Veo AI'"></p>
+                                            <p class="text-[11px] text-slate-400" x-text="'Độ phân giải: ' + videoResolution + ' • Thời lượng: ' + videoDuration + 's'"></p>
+                                        </div>
+                                        <button @click="downloadSingleMedia(vid.local_url || vid.url, 'video')" class="px-3.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs flex items-center space-x-1.5 transition-colors shadow">
+                                            <i class="fa-solid fa-download text-xs"></i>
+                                            <span>Tải Video về máy</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- TAB 3: THƯ VIỆN & TẢI VỀ (GALLERY & DOWNLOADS) -->
+        <!-- ============================================== -->
+        <div x-show="currentTab === 'gallery'" class="space-y-6" x-cloak>
+            <div class="bg-flow-card border border-flow-border rounded-2xl p-6 shadow-xl">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 gap-4">
+                    <div>
+                        <h2 class="font-bold text-lg text-slate-100 flex items-center space-x-2">
+                            <i class="fa-solid fa-folder-open text-emerald-400"></i>
+                            <span>Thư Viện Ảnh & Video Đã Tải Về Máy</span>
+                        </h2>
+                        <p class="text-xs text-slate-400 mt-0.5">Tất cả tệp được lưu tự động trong thư mục <code class="text-blue-400 code-font">downloads/</code></p>
+                    </div>
+
+                    <div class="flex items-center space-x-3">
+                        <button @click="fetchGallery()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 flex items-center space-x-1.5 transition-colors">
+                            <i class="fa-solid fa-rotate-right" :class="{'animate-spin': galleryLoading}"></i>
+                            <span>Làm mới</span>
+                        </button>
+                        <button @click="openDownloadsFolder()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center space-x-2 transition-all shadow-lg shadow-emerald-500/20">
+                            <i class="fa-regular fa-folder"></i>
+                            <span>Mở thư mục trong Explorer</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Gallery Grid -->
+                <div class="mt-6">
+                    <div x-show="galleryLoading" class="py-20 text-center text-slate-400">
+                        <i class="fa-solid fa-spinner animate-spin text-2xl text-emerald-400 mb-2"></i>
+                        <p class="text-xs">Đang tải danh sách tệp...</p>
+                    </div>
+
+                    <div x-show="!galleryLoading && galleryItems.length === 0" class="py-20 text-center text-slate-500">
+                        <i class="fa-regular fa-folder-open text-4xl mb-3 text-slate-600"></i>
+                        <p class="text-sm font-semibold text-slate-400">Chưa có tệp nào trong thư mục tải về</p>
+                        <p class="text-xs text-slate-500 mt-1">Các ảnh và video bạn tạo sẽ được hiển thị ở đây để tải lại bất cứ lúc nào.</p>
+                    </div>
+
+                    <div x-show="!galleryLoading && galleryItems.length > 0" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                        <template x-for="item in galleryItems" :key="item.filename">
+                            <div class="group relative rounded-xl overflow-hidden border border-slate-800 bg-slate-900 flex flex-col justify-between">
+                                <div class="aspect-square bg-black overflow-hidden relative flex items-center justify-center">
+                                    <template x-if="item.type === 'image'">
+                                        <img :src="item.url" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy">
+                                    </template>
+                                    <template x-if="item.type === 'video'">
+                                        <div class="w-full h-full flex items-center justify-center bg-slate-950 relative">
+                                            <video :src="item.url" class="w-full h-full object-cover"></video>
+                                            <div class="absolute inset-0 bg-black/30 flex items-center justify-center">
+                                                <i class="fa-solid fa-play text-white text-xl drop-shadow"></i>
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <!-- Overlay action -->
+                                    <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center space-x-2">
+                                        <a :href="item.url" download class="p-2 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs" title="Tải xuống tệp">
+                                            <i class="fa-solid fa-download"></i>
+                                        </a>
+                                        <a :href="item.url" target="_blank" class="p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-white text-xs" title="Mở tab mới">
+                                            <i class="fa-solid fa-up-right-from-square"></i>
+                                        </a>
+                                    </div>
+                                </div>
+                                <div class="p-2.5 bg-slate-950 text-[11px] border-t border-slate-800">
+                                    <p class="text-slate-300 font-medium truncate" :title="item.filename" x-text="item.filename"></p>
+                                    <div class="flex items-center justify-between text-slate-500 mt-1 text-[10px]">
+                                        <span x-text="item.size_mb + ' MB'"></span>
+                                        <span x-text="item.created_at.split(' ')[0]"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- TAB 4: CÀI ĐẶT COOKIE GOOGLE FLOW             -->
+        <!-- ============================================== -->
+        <div x-show="currentTab === 'settings'" class="space-y-6" x-cloak>
+            <div class="max-w-3xl mx-auto bg-flow-card border border-flow-border rounded-2xl p-6 shadow-xl space-y-6">
+                <div class="pb-4 border-b border-slate-800">
+                    <h2 class="font-bold text-lg text-amber-400 flex items-center space-x-2">
+                        <i class="fa-solid fa-key"></i>
+                        <span>Cài Đặt Xác Thực Google Flow AI</span>
+                    </h2>
+                    <p class="text-xs text-slate-400 mt-1">Nhập Cookie từ trang web Google Flow (flow.google.com) để kết nối trực tiếp tài khoản của bạn.</p>
+                </div>
+
+                <!-- Input Cookie -->
+                <div class="space-y-3">
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">Cookie Chuỗi (Cookie String hoặc JSON Array)</label>
+                    <textarea 
+                        x-model="cookieInput" 
+                        rows="6" 
+                        placeholder="Dán toàn bộ Cookie chuỗi tại đây (ví dụ: __Secure-1PSID=...; SAPISID=...; SID=... hoặc cURL command)"
+                        class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3.5 text-xs text-slate-200 placeholder-slate-600 code-font focus:outline-none focus:border-amber-500 transition-all"></textarea>
+                    
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs text-slate-400" x-text="cookieStatusText"></span>
+                        <button 
+                            @click="saveAndTestCookie()" 
+                            :disabled="savingCookie || !cookieInput.trim()"
+                            :class="savingCookie || !cookieInput.trim() ? 'opacity-50 cursor-not-allowed bg-slate-800 text-slate-500' : 'bg-amber-600 hover:bg-amber-500 text-white font-bold'"
+                            class="px-5 py-2.5 rounded-xl text-xs flex items-center space-x-2 transition-all">
+                            <i class="fa-solid fa-check" :class="{'animate-spin': savingCookie}"></i>
+                            <span x-text="savingCookie ? 'Đang kiểm tra kết nối...' : 'Lưu & Kiểm Tra Cookie'"></span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Hướng Dẫn Lấy Cookie -->
+                <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-3 text-xs text-slate-300">
+                    <h4 class="font-bold text-slate-200 flex items-center space-x-2 text-sm text-blue-400">
+                        <i class="fa-solid fa-circle-question"></i>
+                        <span>Cách lấy Cookie Google Flow trong 30 giây:</span>
+                    </h4>
+                    <ol class="list-decimal list-inside space-y-2 text-slate-400 leading-relaxed">
+                        <li>Truy cập <a href="https://flow.google.com" target="_blank" class="text-blue-400 underline font-semibold">https://flow.google.com</a> trên trình duyệt và đăng nhập tài khoản Google của bạn.</li>
+                        <li>Nhấn phím <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-200 font-mono">F12</kbd> (hoặc chuột phải chọn <b>Kiểm tra / Inspect</b>).</li>
+                        <li>Chuyển sang tab <b>Network (Mạng)</b> và tải lại trang (<kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-200 font-mono">F5</kbd>).</li>
+                        <li>Bấm vào yêu cầu đầu tiên (<code class="text-blue-400">flow.google.com</code>), tại phần <b>Request Headers</b>, copy toàn bộ giá trị của trường <code class="text-amber-400 font-mono">Cookie: ...</code>.</li>
+                        <li>Dán vào ô nhập bên trên và nhấn <b>Lưu & Kiểm Tra Cookie</b>. Số điểm (credits) của bạn sẽ hiển thị ngay lập tức!</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800/80 py-4 bg-flow-dark text-center text-xs text-slate-500">
+        <p>Google Flow AI Studio Tool • Tạo ảnh (🍌 Nano Banana) & Video (🔊 Omni Flash / Veo 3.1) • Tự động tải về máy</p>
+    </footer>
+
+    <!-- Alpine App Logic -->
+    <script>
+        function flowApp() {
+            return {
+                currentTab: 'image',
+                cookieSet: false,
+                credits: 0,
+                creditsLoading: false,
+                
+                // Models Data
+                models: {
+                    image_models: [],
+                    video_models: [],
+                    aspect_ratios_image: ['16:9', '9:16', '1:1', '4:3', '3:4'],
+                    aspect_ratios_video: ['16:9', '9:16'],
+                    video_resolutions: ['720p', '360p'],
+                    video_durations: [4, 6, 8, 10],
+                    batch_counts: [1, 2, 3, 4]
+                },
+
+                // Image Generator Form
+                imagePrompt: '',
+                imageNegativePrompt: '',
+                imageModel: 'Nano Banana 2.1',
+                imageRatio: '16:9',
+                imageCount: 2,
+                imageSeed: '',
+                autoDownloadImage: true,
+                generatingImage: false,
+                latestImages: [],
+
+                // Video Generator Form
+                videoMode: 'text',
+                videoPrompt: '',
+                videoModel: 'Omni 1.1 Flash',
+                videoRatio: '16:9',
+                videoResolution: '720p',
+                videoDuration: 8,
+                videoCount: 1,
+                startFrameUrl: '',
+                startFramePreview: '',
+                endFrameUrl: '',
+                endFramePreview: '',
+                autoDownloadVideo: true,
+                generatingVideo: false,
+                latestVideos: [],
+
+                // Gallery
+                galleryItems: [],
+                galleryCount: 0,
+                galleryLoading: false,
+
+                // Settings
+                cookieInput: '',
+                cookieStatusText: '',
+                savingCookie: false,
+
+                async init() {
+                    await this.fetchConfig();
+                    await this.fetchModels();
+                    await this.fetchCredits();
+                    await this.fetchGallery();
+                },
+
+                async fetchConfig() {
+                    try {
+                        const res = await fetch('/api/config');
+                        const data = await res.json();
+                        this.cookieSet = data.cookie_set;
+                        if (data.masked_cookie) {
+                            this.cookieStatusText = `Đã lưu cookie: ${data.masked_cookie}`;
+                        } else {
+                            this.cookieStatusText = 'Chưa có cookie được lưu.';
+                        }
+                    } catch (e) {
+                        console.error('Fetch config error:', e);
+                    }
+                },
+
+                async fetchModels() {
+                    try {
+                        const res = await fetch('/api/models');
+                        const data = await res.json();
+                        this.models = data;
+                        if (data.image_models && data.image_models.length > 0) {
+                            const hasCurrent = data.image_models.some(m => m.id === this.imageModel);
+                            if (!hasCurrent) this.imageModel = data.image_models[0].id;
+                        }
+                        if (data.video_models && data.video_models.length > 0) {
+                            const hasCurrent = data.video_models.some(m => m.id === this.videoModel);
+                            if (!hasCurrent) this.videoModel = data.video_models[0].id;
+                        }
+                    } catch (e) {
+                        console.error('Fetch models error:', e);
+                    }
+                },
+
+                async fetchCredits() {
+                    this.creditsLoading = true;
+                    try {
+                        const res = await fetch('/api/credits');
+                        const data = await res.json();
+                        if (data.success) {
+                            this.credits = data.credits;
+                        }
+                    } catch (e) {
+                        console.error('Fetch credits error:', e);
+                    } finally {
+                        this.creditsLoading = false;
+                    }
+                },
+
+                async fetchGallery() {
+                    this.galleryLoading = true;
+                    try {
+                        const res = await fetch('/api/gallery');
+                        const data = await res.json();
+                        this.galleryItems = data.items || [];
+                        this.galleryCount = data.count || 0;
+                    } catch (e) {
+                        console.error('Fetch gallery error:', e);
+                    } finally {
+                        this.galleryLoading = false;
+                    }
+                },
+
+                addPromptStyle(style) {
+                    if (this.imagePrompt.trim()) {
+                        this.imagePrompt += ', ' + style;
+                    } else {
+                        this.imagePrompt = style;
+                    }
+                },
+
+                getRatioLabel(r) {
+                    const map = {
+                        '16:9': 'Ngang',
+                        '9:16': 'Dọc Story',
+                        '1:1': 'Vuông',
+                        '4:3': 'Ngang 4:3',
+                        '3:4': 'Dọc 3:4'
+                    };
+                    return map[r] || '';
+                },
+
+                async generateImage() {
+                    if (!this.imagePrompt.trim()) return;
+                    this.generatingImage = true;
+                    try {
+                        const res = await fetch('/api/generate/image', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                prompt: this.imagePrompt,
+                                model: this.imageModel,
+                                aspect_ratio: this.imageRatio,
+                                count: parseInt(this.imageCount),
+                                seed: this.imageSeed ? parseInt(this.imageSeed) : null,
+                                negative_prompt: this.imageNegativePrompt,
+                                auto_download: this.autoDownloadImage
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.success && data.images) {
+                            this.latestImages = data.images;
+                            if (data.credits_remaining !== undefined) {
+                                this.credits = data.credits_remaining;
+                            }
+                            await this.fetchGallery();
+                        } else {
+                            alert('Lỗi tạo ảnh: ' + (data.error || 'Vui lòng kiểm tra cookie'));
+                        }
+                    } catch (e) {
+                        alert('Lỗi kết nối: ' + e.message);
+                    } finally {
+                        this.generatingImage = false;
+                    }
+                },
+
+                async generateVideo() {
+                    if (!this.videoPrompt.trim() && !this.startFrameUrl) return;
+                    this.generatingVideo = true;
+                    try {
+                        const res = await fetch('/api/generate/video', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                prompt: this.videoPrompt,
+                                model: this.videoModel,
+                                aspect_ratio: this.videoRatio,
+                                resolution: this.videoResolution,
+                                duration: parseInt(this.videoDuration),
+                                count: parseInt(this.videoCount || 1),
+                                start_image_url: (this.videoMode === 'image' || this.videoMode === 'interpolate') ? (this.startFrameUrl || null) : null,
+                                end_image_url: (this.videoMode === 'interpolate') ? (this.endFrameUrl || null) : null,
+                                auto_download: this.autoDownloadVideo
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            if (data.videos && data.videos.length > 0) {
+                                this.latestVideos = data.videos;
+                            } else if (data.status === 'PROCESSING') {
+                                alert('✓ Yêu cầu tạo video đã được gửi thành công!\n\nVideo Omni/Veo đang được render trên máy chủ Google Flow (khoảng 1 - 2 phút).\nBạn có thể nhấn "Làm mới Thư viện" sau ít phút để xem video đã tạo.');
+                            }
+                            if (data.credits_remaining !== undefined) {
+                                this.credits = data.credits_remaining;
+                            }
+                            await this.fetchGallery();
+                        } else {
+                            alert('Lỗi tạo video: ' + (data.error || 'Vui lòng kiểm tra cookie'));
+                        }
+                    } catch (e) {
+                        alert('Lỗi kết nối: ' + e.message);
+                    } finally {
+                        this.generatingVideo = false;
+                    }
+                },
+
+                async uploadStartFrame(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    this.startFramePreview = URL.createObjectURL(file);
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    try {
+                        const res = await fetch('/api/upload-frame', { method: 'POST', body: formData });
+                        const data = await res.json();
+                        if (data.success) {
+                            this.startFrameUrl = data.url;
+                        }
+                    } catch (e) {
+                        console.error('Upload frame error:', e);
+                    }
+                },
+
+                async uploadEndFrame(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    this.endFramePreview = URL.createObjectURL(file);
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    try {
+                        const res = await fetch('/api/upload-frame', { method: 'POST', body: formData });
+                        const data = await res.json();
+                        if (data.success) {
+                            this.endFrameUrl = data.url;
+                        }
+                    } catch (e) {
+                        console.error('Upload end frame error:', e);
+                    }
+                },
+
+                async downloadSingleMedia(url, mediaType) {
+                    try {
+                        const res = await fetch('/api/download', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ url: url, media_type: mediaType })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            alert('Đã tải thành công tệp: ' + data.filename);
+                            await this.fetchGallery();
+                        } else {
+                            alert('Lỗi tải: ' + data.error);
+                        }
+                    } catch (e) {
+                        alert('Lỗi kết nối khi tải: ' + e.message);
+                    }
+                },
+
+                async openDownloadsFolder() {
+                    try {
+                        const res = await fetch('/api/open-folder', { method: 'POST' });
+                        const data = await res.json();
+                        if (!data.success) {
+                            alert('Không thể mở thư mục tự động: ' + data.error);
+                        }
+                    } catch (e) {
+                        console.error('Open folder error:', e);
+                    }
+                },
+
+                async saveAndTestCookie() {
+                    if (!this.cookieInput.trim()) return;
+                    this.savingCookie = true;
+                    try {
+                        const res = await fetch('/api/cookie', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ cookie: this.cookieInput })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            this.cookieSet = true;
+                            this.credits = data.credits;
+                            this.cookieStatusText = `✓ Kết nối thành công! Số điểm hiện có: ${data.credits}`;
+                            alert(`Kết nối tài khoản Google Flow thành công!\nSố điểm hiện có: ${data.credits} credits.`);
+                        } else {
+                            this.cookieStatusText = `Lỗi: ${data.message}`;
+                            alert(`Không thể xác thực cookie:\n${data.message}`);
+                        }
+                    } catch (e) {
+                        alert('Lỗi kết nối: ' + e.message);
+                    } finally {
+                        this.savingCookie = false;
+                        await this.fetchConfig();
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>

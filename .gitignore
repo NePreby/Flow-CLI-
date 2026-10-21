@@ -1,0 +1,35 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Configuration & Secrets
+config.json
+*.cookie
+*.env
+
+# Local generated assets & uploads
+downloads/*
+!downloads/.gitkeep
+uploads/*
+!uploads/.gitkeep
+scratch/
+
+# IDE & Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
