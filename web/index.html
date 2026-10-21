@@ -553,7 +553,16 @@
                                 <i class="fa-solid fa-film text-purple-400"></i>
                                 <span>Video Vừa Tạo</span>
                             </h3>
-                            <span class="text-xs text-slate-500" x-text="latestVideos.length ? latestVideos.length + ' video' : 'Chưa có video'"></span>
+                            <div class="flex items-center space-x-2">
+                                <button 
+                                    @click="syncVideosFromFlow()" 
+                                    :disabled="syncingVideos"
+                                    class="px-2.5 py-1 text-xs rounded-lg bg-slate-800 hover:bg-purple-600/30 text-purple-300 border border-slate-700 flex items-center space-x-1 transition-all">
+                                    <i class="fa-solid fa-rotate text-[11px]" :class="{'animate-spin': syncingVideos}"></i>
+                                    <span x-text="syncingVideos ? 'Đang đồng bộ...' : 'Đồng bộ từ Flow'"></span>
+                                </button>
+                                <span class="text-xs text-slate-500" x-text="latestVideos.length ? latestVideos.length + ' video' : 'Chưa có video'"></span>
+                            </div>
                         </div>
 
                         <!-- Loading State Video -->
@@ -619,6 +628,10 @@
                     </div>
 
                     <div class="flex items-center space-x-3">
+                        <button @click="syncVideosFromFlow()" :disabled="syncingVideos" class="px-3.5 py-2 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 text-xs font-semibold border border-purple-500/30 flex items-center space-x-1.5 transition-all shadow-sm">
+                            <i class="fa-solid fa-cloud-arrow-down" :class="{'animate-bounce': syncingVideos}"></i>
+                            <span x-text="syncingVideos ? 'Đang đồng bộ từ Flow...' : 'Đồng bộ video từ Google Flow'"></span>
+                        </button>
                         <button @click="fetchGallery()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 flex items-center space-x-1.5 transition-colors">
                             <i class="fa-solid fa-rotate-right" :class="{'animate-spin': galleryLoading}"></i>
                             <span>Làm mới</span>
@@ -786,6 +799,7 @@
                 endFramePreview: '',
                 autoDownloadVideo: true,
                 generatingVideo: false,
+                syncingVideos: false,
                 latestVideos: [],
 
                 // Gallery
@@ -994,7 +1008,18 @@
                     }
                 },
 
-                async downloadSingleMedia(url, mediaType) {
+                async downloadSingleMedia(url, mediaType = 'image') {
+                    if (!url) return;
+                    // Nếu tệp đã có sẵn trên máy (local_url), kích hoạt tải trực tiếp về trình duyệt
+                    if (url.startsWith('/downloads/')) {
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = url.split('/').pop();
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        return;
+                    }
                     try {
                         const res = await fetch('/api/download', {
                             method: 'POST',
@@ -1003,6 +1028,12 @@
                         });
                         const data = await res.json();
                         if (data.success) {
+                            const a = document.createElement('a');
+                            a.href = data.local_url;
+                            a.download = data.filename;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
                             alert('Đã tải thành công tệp: ' + data.filename);
                             await this.fetchGallery();
                         } else {
@@ -1010,6 +1041,29 @@
                         }
                     } catch (e) {
                         alert('Lỗi kết nối khi tải: ' + e.message);
+                    }
+                },
+
+                async syncVideosFromFlow() {
+                    this.syncingVideos = true;
+                    try {
+                        const res = await fetch('/api/sync-videos', { method: 'POST' });
+                        const data = await res.json();
+                        if (data.success) {
+                            if (data.videos && data.videos.length > 0) {
+                                this.latestVideos = data.videos;
+                                alert(`✓ Đã đồng bộ thành công ${data.synced_count} video mới từ Google Flow về máy!`);
+                            } else {
+                                alert('Đã kiểm tra Google Flow: Tất cả video đã được tải về máy đầy đủ!');
+                            }
+                            await this.fetchGallery();
+                        } else {
+                            alert('Lỗi đồng bộ: ' + (data.error || 'Vui lòng kiểm tra cookie'));
+                        }
+                    } catch (e) {
+                        alert('Lỗi kết nối khi đồng bộ: ' + e.message);
+                    } finally {
+                        this.syncingVideos = false;
                     }
                 },
 

@@ -621,8 +621,8 @@ class GoogleFlowClient:
         count = max(1, min(4, count or 1))
         project_id = self.get_or_create_project_id()
 
-        # Tính toán timeout động theo số lượng video (Google Flow render video 120-180s mỗi đợt)
-        dynamic_timeout = max(220, 160 + (count * 80))
+        # Tính toán timeout động theo số lượng video (Google Flow render video 180-300s mỗi đợt)
+        dynamic_timeout = max(360, 240 + (count * 100))
 
         # Thực thi qua Native Flow Engine (vượt qua reCAPTCHA Enterprise và xác thực phiên hoàn chỉnh)
         try:
@@ -735,35 +735,61 @@ class GoogleFlowClient:
         return results
 
     def download_media(self, url: str, output_path: Union[str, Path]) -> Tuple[bool, str]:
-        """Tải ảnh hoặc video từ URL trực tiếp về máy."""
+        """Tải ảnh hoặc video từ URL trực tiếp về máy với header giả lập trình duyệt chuẩn xác."""
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         try:
             download_url = url
-            headers = {"Referer": "https://flow.google.com/"}
             if "/asb/" in download_url and "=s" not in download_url:
                 download_url += "=s1600-rw"
 
-            # Tự động điều chỉnh phần mở rộng file nếu là webp
-            res = self.session.get(download_url, headers=headers, stream=True, timeout=60)
-            if res.status_code == 200:
-                ct = res.headers.get("content-type", "")
-                if "webp" in ct and output_path.suffix.lower() in [".jpg", ".jpeg"]:
-                    output_path = output_path.with_suffix(".webp")
-                with open(output_path, "wb") as f:
-                    for chunk in res.iter_content(chunk_size=65536):
-                        if chunk:
-                            f.write(chunk)
-                return True, str(output_path)
-            else:
-                r2 = requests.get(download_url, headers=headers, stream=True, timeout=60)
-                if r2.status_code == 200:
-                    with open(output_path, "wb") as f:
-                        for chunk in r2.iter_content(chunk_size=65536):
-                            if chunk:
-                                f.write(chunk)
-                    return True, str(output_path)
-                return False, f"HTTP Error {res.status_code}"
+            # Danh sách User-Agent chuẩn (bao gồm HeadlessChrome tương thích với hash eaua của Google Video)
+            candidate_user_agents = [
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.7827.55 Safari/537.36",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36"
+            ]
+
+            last_error = "Unknown error"
+            for ua in candidate_user_agents:
+                headers = {
+                    "User-Agent": ua,
+                    "Referer": "https://flow.google.com/",
+                    "Origin": "https://flow.google.com",
+                    "Accept": "*/*"
+                }
+                # Thử tải trực tiếp không kèm cookie trước (phù hợp với googlevideo signed URLs)
+                try:
+                    res = requests.get(download_url, headers=headers, stream=True, timeout=90)
+                    if res.status_code in [200, 206]:
+                        ct = res.headers.get("content-type", "")
+                        if "webp" in ct and output_path.suffix.lower() in [".jpg", ".jpeg"]:
+                            output_path = output_path.with_suffix(".webp")
+                        with open(output_path, "wb") as f:
+                            for chunk in res.iter_content(chunk_size=65536):
+                                if chunk:
+                                    f.write(chunk)
+                        return True, str(output_path)
+                    last_error = f"HTTP Error {res.status_code}"
+                except Exception as ex:
+                    last_error = str(ex)
+
+                # Thử với session cookies nếu cần
+                try:
+                    res2 = self.session.get(download_url, headers=headers, stream=True, timeout=90)
+                    if res2.status_code in [200, 206]:
+                        ct = res2.headers.get("content-type", "")
+                        if "webp" in ct and output_path.suffix.lower() in [".jpg", ".jpeg"]:
+                            output_path = output_path.with_suffix(".webp")
+                        with open(output_path, "wb") as f:
+                            for chunk in res2.iter_content(chunk_size=65536):
+                                if chunk:
+                                    f.write(chunk)
+                        return True, str(output_path)
+                    last_error = f"HTTP Error {res2.status_code}"
+                except Exception as ex:
+                    last_error = str(ex)
+
+            return False, last_error
         except Exception as e:
             return False, str(e)
 

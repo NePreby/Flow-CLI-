@@ -435,7 +435,8 @@ def _generate_video_native_impl(
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
-            context = browser.new_context(viewport={"width": 1400, "height": 900})
+            user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36"
+            context = browser.new_context(viewport={"width": 1400, "height": 900}, user_agent=user_agent)
             context.add_cookies(_parse_cookie_list(cookie_str))
 
             page = context.new_page()
@@ -443,7 +444,7 @@ def _generate_video_native_impl(
             # Lắng nghe và thu thập video stream URL đã có sẵn khi nạp trang
             def on_initial_response(resp):
                 u = resp.url
-                if "flow-content.google/video" in u and resp.status in [200, 206]:
+                if ("flow-content.google/video" in u or "googlevideo.com/videoplayback" in u) and resp.status in [200, 206]:
                     existing_video_bases.add(u.split("?")[0])
 
             page.on("response", on_initial_response)
@@ -457,10 +458,11 @@ def _generate_video_native_impl(
 
             def on_new_response(resp):
                 u = resp.url
-                if "flow-content.google/video" in u and resp.status in [200, 206]:
+                if ("flow-content.google/video" in u or "googlevideo.com/videoplayback" in u) and resp.status in [200, 206]:
                     base = u.split("?")[0]
                     if base not in existing_video_bases and base not in captured_video_map:
                         captured_video_map[base] = u
+                        _safe_print(f"[✓] Da bat duoc stream video: {base[:60]}")
 
             page.on("response", on_new_response)
 
@@ -587,42 +589,38 @@ def _generate_video_native_impl(
                     last_log_time = elapsed
                     _safe_print(f"[*] Dang cho Google Flow render video ({elapsed}s / {timeout_sec}s)... (Da nhan {len(captured_video_map)}/{needed} video)")
 
-                # Quét các tile video ở hàng đầu (vị trí mới nhất trên canvas)
+                # Quét trực tiếp các tile flow-tile-container trên canvas
                 try:
-                    footers = page.locator('.footer-left')
-                    total_f = footers.count()
-                    for i in range(min(needed * 2, total_f)):
+                    tiles = page.locator('flow-tile-container').all()
+                    for i in range(min(needed * 2, len(tiles))):
                         if i in clicked_tiles:
                             continue
-                        f = footers.nth(i)
-                        is_vid = f.evaluate('''el => {
-                            const icon = el.querySelector("mat-icon")?.textContent?.trim() || "";
-                            return icon === "videocam" || icon === "play_circle" || icon === "play_arrow" || (icon !== "" && icon !== "image");
-                        }''')
+                        t = tiles[i]
+                        # Kiểm tra xem có icon video không
+                        is_vid = t.locator('mat-icon:has-text("play_arrow"), mat-icon:has-text("play_circle"), mat-icon:has-text("videocam")').count() > 0
                         if not is_vid:
                             continue
 
-                        # Kiểm tra xem video đã render xong (thẻ img thumbnail đã sẵn sàng)
-                        is_ready = f.evaluate('''el => {
-                            const card = el.closest("flow-tile-container") || el.closest("flow-image-tile") || el.parentElement.parentElement.parentElement;
-                            const im = card ? card.querySelector("img") : null;
-                            return (im && im.src && im.src.includes("/asb/"));
+                        # Kiểm tra thumbnail video đã render hoàn tất
+                        has_thumb = t.evaluate('''el => {
+                            const im = el.querySelector("img");
+                            return !!(im && im.src && im.src.includes("/asb/"));
                         }''')
-                        if is_ready:
-                            f.scroll_into_view_if_needed()
+                        if has_thumb:
+                            t.scroll_into_view_if_needed()
                             page.wait_for_timeout(300)
-                            box = f.bounding_box()
-                            if box:
+                            b = t.bounding_box()
+                            if b:
                                 prev_count = len(captured_video_map)
-                                page.mouse.click(box['x'] + 50, box['y'] - 100)
-                                # Chờ nhận stream video của tile này (tối đa 4.5s)
+                                # Click ngay giữa tile để phát video và kích hoạt stream network
+                                page.mouse.click(b['x'] + b['width'] / 2, b['y'] + b['height'] / 2)
                                 click_start = time.time()
-                                while time.time() - click_start < 4.5:
+                                while time.time() - click_start < 5.0:
                                     if len(captured_video_map) > prev_count:
                                         break
                                     page.wait_for_timeout(300)
                                 page.keyboard.press("Escape")
-                                page.wait_for_timeout(600)
+                                page.wait_for_timeout(500)
                                 if len(captured_video_map) > prev_count:
                                     clicked_tiles.add(i)
                 except Exception:
@@ -631,8 +629,8 @@ def _generate_video_native_impl(
                 if len(captured_video_map) >= needed:
                     break
 
-                # Định kỳ làm mới trang mỗi 15s sau 20s đầu để đồng bộ video tiles mới nhất từ server
-                if elapsed >= 20 and (elapsed % 15) < 3 and len(captured_video_map) < needed:
+                # Định kỳ làm mới trang mỗi 45s sau 60s đầu để đồng bộ video tiles mới nhất từ server nếu chưa nhận được
+                if elapsed >= 60 and (elapsed % 45) < 4 and len(captured_video_map) < needed:
                     try:
                         page.goto(project_url, wait_until="domcontentloaded", timeout=25000)
                         page.wait_for_timeout(3000)
@@ -679,3 +677,70 @@ def generate_image_native(*args, **kwargs) -> Dict[str, Any]:
 def generate_video_native(*args, **kwargs) -> Dict[str, Any]:
     """Hàm bọc an toàn chạy ngoài asyncio loop cho generate_video."""
     return _run_in_thread(_generate_video_native_impl, *args, **kwargs)
+
+def _sync_canvas_videos_impl(cookie_str: str, project_id: str, max_videos: int = 4) -> List[Dict[str, Any]]:
+    """Quét canvas và lấy link stream của các video mới nhất trong dự án."""
+    if not cookie_str:
+        return []
+    videos = []
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36"
+            context = browser.new_context(viewport={"width": 1400, "height": 900}, user_agent=user_agent)
+            context.add_cookies(_parse_cookie_list(cookie_str))
+            page = context.new_page()
+
+            captured = {}
+            def on_resp(resp):
+                u = resp.url
+                if ("flow-content.google/video" in u or "googlevideo.com/videoplayback" in u) and resp.status in [200, 206]:
+                    base = u.split("?")[0]
+                    if base not in captured:
+                        captured[base] = u
+
+            page.on("response", on_resp)
+            page.goto(f"https://flow.google.com/project/{project_id}", wait_until="domcontentloaded", timeout=25000)
+            page.wait_for_timeout(3500)
+
+            tiles = page.locator('flow-tile-container').all()
+            for i, t in enumerate(tiles[:min(max_videos * 2, len(tiles))]):
+                is_vid = t.locator('mat-icon:has-text("play_arrow"), mat-icon:has-text("play_circle"), mat-icon:has-text("videocam")').count() > 0
+                if not is_vid:
+                    continue
+                prompt_txt = ""
+                try:
+                    f = t.locator('.footer-left').first
+                    if f.count() > 0:
+                        prompt_txt = f.text_content().strip().lstrip("play_circle").lstrip("videocam").strip()
+                except Exception:
+                    pass
+
+                b = t.bounding_box()
+                if b:
+                    prev_c = len(captured)
+                    page.mouse.click(b['x'] + b['width'] / 2, b['y'] + b['height'] / 2)
+                    st = time.time()
+                    while time.time() - st < 3.5:
+                        if len(captured) > prev_c:
+                            break
+                        page.wait_for_timeout(200)
+                    page.keyboard.press("Escape")
+                    page.wait_for_timeout(300)
+                    if len(captured) > prev_c:
+                        new_urls = [u for u in captured.values()]
+                        videos.append({
+                            "url": new_urls[-1],
+                            "prompt": prompt_txt or f"Video_{i+1}"
+                        })
+                if len(videos) >= max_videos:
+                    break
+
+            browser.close()
+    except Exception as e:
+        _safe_print(f"[!] Loi sync canvas videos: {e}")
+    return videos
+
+def sync_canvas_videos(*args, **kwargs) -> List[Dict[str, Any]]:
+    """Hàm bọc an toàn chạy ngoài asyncio loop cho sync_canvas_videos."""
+    return _run_in_thread(_sync_canvas_videos_impl, *args, **kwargs)

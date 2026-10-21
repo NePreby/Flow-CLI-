@@ -282,6 +282,19 @@ async def api_download_media(req: DownloadRequest):
     target_dir = Path(cfg.get("downloads_dir", DOWNLOADS_DIR))
     target_dir.mkdir(parents=True, exist_ok=True)
 
+    url = req.url
+    # Nếu url là đường dẫn local /downloads/xxx, file đã có sẵn trên máy
+    if url.startswith("/downloads/"):
+        fname = Path(url).name
+        local_p = target_dir / fname
+        if local_p.exists():
+            return {
+                "success": True,
+                "filename": fname,
+                "path": str(local_p),
+                "local_url": url
+            }
+
     ext = ".mp4" if req.media_type == "video" else ".jpg"
     filename = req.filename or f"flow_download_{int(time.time())}{ext}"
     if not filename.endswith(ext):
@@ -290,18 +303,60 @@ async def api_download_media(req: DownloadRequest):
 
     cookie = get_cookie()
     client = get_client() if cookie else demo_client
-    ok, path_or_err = client.download_media(req.url, save_path)
+    ok, path_or_err = await asyncio.to_thread(client.download_media, req.url, save_path)
     
     if ok:
         return {
             "success": True,
-            "filename": filename,
+            "filename": Path(path_or_err).name,
             "path": str(path_or_err),
-            "local_url": f"/downloads/{filename}"
+            "local_url": f"/downloads/{Path(path_or_err).name}"
         }
     return {
         "success": False,
         "error": path_or_err
+    }
+
+
+@app.post("/api/sync-videos")
+async def api_sync_videos():
+    """Đồng bộ các video mới nhất từ canvas Google Flow về thư mục downloads."""
+    cookie = get_cookie()
+    if not cookie:
+        return {"success": False, "error": "Chưa cấu hình Cookie"}
+    
+    cfg = load_config()
+    target_dir = Path(cfg.get("downloads_dir", DOWNLOADS_DIR))
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    client = get_client()
+    proj_id = client.get_or_create_project_id()
+
+    from flow_worker import sync_canvas_videos
+    found_videos = await asyncio.to_thread(sync_canvas_videos, cookie, proj_id, 4)
+    
+    downloaded = []
+    for idx, v in enumerate(found_videos):
+        url = v.get("url")
+        prompt = v.get("prompt", "video")
+        if url:
+            timestamp = int(time.time())
+            safe_prompt = "".join([c if c.isalnum() else "_" for c in prompt[:30]]).strip("_")
+            filename = f"flow_video_{timestamp}_{idx+1}_{safe_prompt}.mp4"
+            save_path = target_dir / filename
+            ok, p = await asyncio.to_thread(client.download_media, url, save_path)
+            if ok:
+                downloaded.append({
+                    "filename": Path(p).name,
+                    "local_url": f"/downloads/{Path(p).name}",
+                    "url": url,
+                    "prompt": prompt
+                })
+
+    return {
+        "success": True,
+        "synced_count": len(downloaded),
+        "videos": downloaded
     }
 
 
