@@ -1,11 +1,11 @@
 <div align="center">
 
-# 🎬 Flow-CLI | Google Flow AI Studio
+# 🎬 Flow-Studio | Google Flow AI Studio
 
-**A production-ready CLI, Web Studio, and Automation Engine for Google Flow (`flow.google.com`).**  
+**A production-ready Web Studio, CLI, and Automation Engine for Google Flow (`flow.google.com`).**  
 *Generate next-generation AI images and cinematic videos with real-time credit tracking, batch generation, and automated media downloading.*
 
-[![GitHub Repo](https://img.shields.io/badge/GitHub-NePreby%2FFlow--CLI--blue?logo=github&style=for-the-badge)](https://github.com/NePreby/Flow-CLI-.git)
+[![GitHub Repo](https://img.shields.io/badge/GitHub-NePreby%2FFlow--Studio-blue?logo=github&style=for-the-badge)](https://github.com/NePreby/Flow-Studio.git)
 [![Python Version](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white&style=for-the-badge)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688?logo=fastapi&logoColor=white&style=for-the-badge)](https://fastapi.tiangolo.com/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
@@ -87,8 +87,8 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/NePreby/Flow-CLI-.git
-cd Flow-CLI-
+git clone https://github.com/NePreby/Flow-Studio.git
+cd Flow-Studio
 
 # Create a virtual environment
 python -m venv venv
@@ -229,7 +229,7 @@ The FastAPI server (`app.py`) exposes full RESTful endpoints for integration int
 ## 📁 Project Architecture
 
 ```
-Flow-CLI/
+Flow-Studio/
 ├── app.py                # FastAPI application & RESTful routing
 ├── cli.py                # Command-line interface with argparse & Rich formatting
 ├── flow_client.py        # Core reverse-engineered Google Flow RPC / Boq client

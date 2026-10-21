@@ -1,6 +1,6 @@
-# 🤝 Contributing to Flow-CLI (Google Flow AI Studio)
+# 🤝 Contributing to Flow-Studio (Google Flow AI Studio)
 
-First off, thank you for considering contributing to **Flow-CLI**! 🎉 Projects like this thrive because of people like you who dedicate their time to building, testing, documenting, and improving developer tools for the open-source community.
+First off, thank you for considering contributing to **Flow-Studio**! 🎉 Projects like this thrive because of people like you who dedicate their time to building, testing, documenting, and improving developer tools for the open-source community.
 
 Please read through these guidelines to ensure a smooth, productive, and collaborative contribution process.
 
@@ -70,12 +70,12 @@ Documentation improvements are always welcome! This includes:
 1. **Fork the repository** on GitHub to your personal account.
 2. **Clone your fork** locally:
    ```bash
-   git clone https://github.com/<your-username>/Flow-CLI-.git
-   cd Flow-CLI-
+   git clone https://github.com/<your-username>/Flow-Studio.git
+   cd Flow-Studio
    ```
 3. **Add upstream remote** to keep your branch updated:
    ```bash
-   git remote add upstream https://github.com/NePreby/Flow-CLI-.git
+   git remote add upstream https://github.com/NePreby/Flow-Studio.git
    ```
 
 ### Installing Dependencies
@@ -182,7 +182,7 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/):
    ```bash
    git push origin feat/your-feature-name
    ```
-6. **Open a Pull Request (PR)** against the `main` branch of `NePreby/Flow-CLI-`.
+6. **Open a Pull Request (PR)** against the `main` branch of `NePreby/Flow-Studio`.
    - Provide a clear summary of what was added or fixed.
    - Attach screenshots or terminal output if visual or CLI changes were made.
    - Reference any related issues (e.g., `Fixes #12`).
@@ -197,4 +197,4 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 ---
 
-Thank you for helping make **Flow-CLI** better for everyone! 🚀
+Thank you for helping make **Flow-Studio** better for everyone! 🚀
